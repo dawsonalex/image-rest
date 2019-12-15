@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 
@@ -17,26 +18,17 @@ var options struct {
 
 	// Path to log file.
 	LogPath string `short:"l" long:"log" default:"nil" optional:"true" optional-value:"log/img-rest.log" description:"The path to the log file. If the arguement is provided without a path, log/img-rest.log is used."`
+
+	ImgDir string `short:"d" long:"dir" required:"true" description:"The directory to serve images from."`
 }
 
 func main() {
 	// init logger
 	logger := logware.NewStdOutLogger()
 
-	_, err := flags.Parse(&options)
-	optionsString := fmt.Sprintf("%+v", options)
-	if err != nil {
-		logger.WithFields(log.Fields{
-			"error":        err.Error(),
-			"default_args": optionsString,
-		}).Warn("Unable to parse arguments. Using Defaults. (Value is nil for no value.)")
-	} else {
-		logger.WithFields(log.Fields{
-			"args": optionsString,
-		}).Info("Parsed args")
-	}
+	parseArgs(logger)
 
-	// Declaring image controller
+	// Declare image controller
 	ic := imagebundle.NewImageController("", logger)
 
 	// Set up routes
@@ -48,7 +40,38 @@ func main() {
 		Addr:    ":8080",
 		Handler: logware.LogRoute(logger, router),
 	}
-	logger.Println("up and running..")
+	logger.WithFields(log.Fields{
+		"port": s.Addr,
+	}).Info("Waiting for requests")
 
 	log.Fatal(s.ListenAndServe())
+}
+
+// Parse command line arguments and log messages
+func parseArgs(logger *log.Logger) {
+	_, err := flags.NewParser(&options, flags.HelpFlag).Parse()
+	if err != nil {
+		flagError, _ := err.(*flags.Error)
+		switch flagError.Type {
+		// ErrHelp message contains the help page.
+		case flags.ErrHelp:
+			// Print the help message as-is and exit.
+			logger.Print(flagError.Message)
+			os.Exit(0)
+
+		// Fatal errors parsing args, end program.
+		case flags.ErrRequired,
+			flags.ErrExpectedArgument:
+			logger.Fatal(flagError.Message)
+
+		// Non-fatal errors, warn and continue.
+		default:
+			logger.Warn("There was an error parsing arguements. Check your config is correct below.")
+		}
+	}
+
+	optionsString := fmt.Sprintf("%+v", options)
+	logger.WithFields(log.Fields{
+		"args": optionsString,
+	}).Info("Parsed args")
 }
