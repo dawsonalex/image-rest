@@ -16,7 +16,7 @@ import (
 type ImageController struct {
 	ContentDir string `json:"contentDir"` // The path to content. Defaults to user HOME
 
-	Logger *log.Logger
+	logger *log.Logger
 }
 
 func defaultContentDir() string {
@@ -32,13 +32,30 @@ func defaultContentDir() string {
 func NewImageController(logger *log.Logger) *ImageController {
 	controller := ImageController{
 		ContentDir: defaultContentDir(),
-		Logger:     logger,
+		logger:     logger,
 	}
 	return &controller
 }
 
+// SetLogger sets the logger on the referenced ImageController.
+func (ic *ImageController) SetLogger(logger *log.Logger) {
+	ic.logger = logger
+}
+
 // HandleUpload saves images from a multipart form submission to disk.
 func (ic *ImageController) HandleUpload() http.HandlerFunc {
+
+	// check here that the directory is writable. If not, log and error.
+	if fileMode, err := os.Stat(ic.ContentDir); err != nil {
+		ic.logger.WithFields(log.Fields{
+			"error":      err,
+			"contentDir": ic.ContentDir,
+		}).Error("There is an error reading from the content directory:")
+	} else if !fileMode.IsDir() {
+		ic.logger.WithFields(log.Fields{
+			"contentDir": ic.ContentDir,
+		}).Error("The contentDir provided is not a directory")
+	}
 
 	// contents of this function taken from https://www.reddit.com/r/golang/comments/apf6l5/multiple_files_upload_using_gos_standard_library/
 	// Read multipart form data from multiple files and write them to disc.
@@ -54,7 +71,7 @@ func (ic *ImageController) HandleUpload() http.HandlerFunc {
 		var part *multipart.Part
 
 		if mr, err = r.MultipartReader(); err != nil {
-			ic.Logger.WithFields(log.Fields{
+			ic.logger.WithFields(log.Fields{
 				"err": err.Error(),
 			}).Error("Error opening multipart reader")
 
@@ -79,7 +96,7 @@ func (ic *ImageController) HandleUpload() http.HandlerFunc {
 
 			if part, err = mr.NextPart(); err != nil {
 				if err != io.EOF {
-					ic.Logger.WithFields(log.Fields{
+					ic.logger.WithFields(log.Fields{
 						"err": err.Error(),
 					}).Error("Error occurred while fetching next part")
 
@@ -96,7 +113,7 @@ func (ic *ImageController) HandleUpload() http.HandlerFunc {
 			fullImgFilePath := filepath.Join(ic.ContentDir, part.FileName())
 			imgfile, err = os.Create(fullImgFilePath)
 			if err != nil {
-				ic.Logger.WithFields(log.Fields{
+				ic.logger.WithFields(log.Fields{
 					"err": err.Error(),
 				}).Error("Error occurred while creating image file")
 
@@ -111,7 +128,7 @@ func (ic *ImageController) HandleUpload() http.HandlerFunc {
 			for !uploaded {
 				if n, err = part.Read(chunk); err != nil {
 					if err != io.EOF {
-						ic.Logger.WithFields(log.Fields{
+						ic.logger.WithFields(log.Fields{
 							"err": err.Error(),
 						}).Error("Error occurred reading chunk")
 
@@ -123,7 +140,7 @@ func (ic *ImageController) HandleUpload() http.HandlerFunc {
 				}
 
 				if n, err = imgfile.Write(chunk[:n]); err != nil {
-					ic.Logger.WithFields(log.Fields{
+					ic.logger.WithFields(log.Fields{
 						"err": err.Error(),
 					}).Error("Error occurred writing chunk to save file")
 
@@ -136,7 +153,7 @@ func (ic *ImageController) HandleUpload() http.HandlerFunc {
 
 			// Only print the name of the file, not the full filepath.
 			baseFileName := filepath.Base(imgfile.Name())
-			ic.Logger.WithFields(log.Fields{
+			ic.logger.WithFields(log.Fields{
 				"filename": baseFileName,
 				"fullpath": fullImgFilePath,
 				"size":     filesize,

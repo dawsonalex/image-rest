@@ -30,8 +30,8 @@ func main() {
 	// Declare image controller
 	ic := &imagebundle.ImageController{
 		ContentDir: options.ImgDir,
-		Logger:     logger,
 	}
+	ic.SetLogger(logger)
 
 	// Set up routes
 	router := http.NewServeMux()
