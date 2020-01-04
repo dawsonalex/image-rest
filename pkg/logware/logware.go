@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -33,7 +34,7 @@ func (r *responseLog) WriteHeader(status int) {
 
 // NewMultiLogger creates a new Logger. The filepath variable is a path to the file
 // that should be created or appended to
-func NewMultiLogger(filePath string) *log.Logger {
+func NewMultiLogger(filePath string) *logrus.Logger {
 	logFile, err := os.Create(filePath)
 	if err != nil {
 		log.Printf("Cannnot use logfile %v:", err)
@@ -51,7 +52,7 @@ func NewMultiLogger(filePath string) *log.Logger {
 }
 
 // NewStdOutLogger returns a logrus instance that writes in colour to stdout.
-func NewStdOutLogger() *log.Logger {
+func NewStdOutLogger() *logrus.Logger {
 	logger := log.New()
 	logger.Out = os.Stdout
 	logger.Formatter = &log.TextFormatter{

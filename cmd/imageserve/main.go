@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 
@@ -13,13 +14,11 @@ import (
 )
 
 var options struct {
-	// Path to config file.
-	ConfigPath string `short:"c" long:"config" default:"nil" optional:"true" optional-value:"conf/config.json" description:"The path to the config file. Defaults to conf/config.json in the directory of the executable."`
-
 	// Path to log file.
-	LogPath string `short:"l" long:"log" default:"nil" optional:"true" optional-value:"log/img-rest.log" description:"The path to the log file. If the arguement is provided without a path, log/img-rest.log is used."`
+	LogPath string `short:"l" long:"log" default:"log/img-rest.log" description:"The path to the log file."`
 
-	ImgDir string `short:"d" long:"dir" required:"true" description:"The directory to serve images from."`
+	// Path to directory to serve
+	ImgDir string `short:"d" long:"dir" default:"." description:"The path to the directory to serve images from."`
 }
 
 func main() {
@@ -29,7 +28,10 @@ func main() {
 	parseArgs(logger)
 
 	// Declare image controller
-	ic := imagebundle.NewImageController("", logger)
+	ic := &imagebundle.ImageController{
+		ContentDir: options.ImgDir,
+		Logger:     logger,
+	}
 
 	// Set up routes
 	router := http.NewServeMux()
@@ -68,6 +70,17 @@ func parseArgs(logger *log.Logger) {
 		default:
 			logger.Warn("There was an error parsing arguements. Check your config is correct below.")
 		}
+	}
+
+	// If the imagedir path is default, set it to dir of
+	// the executable that started the process.
+	if options.ImgDir == "." {
+		ex, err := os.Executable()
+		if err != nil {
+			logger.Panicln(err)
+		}
+		exPath := filepath.Dir(ex)
+		options.ImgDir = exPath
 	}
 
 	optionsString := fmt.Sprintf("%+v", options)

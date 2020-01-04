@@ -3,7 +3,6 @@ package imagebundle
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -12,53 +11,33 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type imageBundleConfig struct {
-	ContentDir string `json:"contentDir"` // The path to content. Defaults to user HOME
-}
-
 // ImageController contains a number of functions for handling requests
 // regarding images or image meta-data.
 type ImageController struct {
-	config *imageBundleConfig
-	logger *log.Logger
+	ContentDir string `json:"contentDir"` // The path to content. Defaults to user HOME
+
+	Logger *log.Logger
 }
 
-func defaultImageBundleConfig() *imageBundleConfig {
-	bundleConfig := new(imageBundleConfig)
-
-	userHome, err := os.UserHomeDir()
+func defaultContentDir() string {
+	contentDir, err := os.UserHomeDir()
 	if err != nil {
-		bundleConfig.ContentDir = os.TempDir()
-	} else {
-		bundleConfig.ContentDir = userHome
+		contentDir = os.TempDir()
 	}
 
-	return bundleConfig
+	return contentDir
 }
 
-func jsonImageBundleConfig(filePath string) *imageBundleConfig {
-	return defaultImageBundleConfig()
-}
-
-// NewImageController returns a new ImageController initialised
-// with a the config at configPath, or a default config.
-func NewImageController(configPath string, logger *log.Logger) *ImageController {
-	var bundleConfig *imageBundleConfig
-	if len(configPath) > 0 {
-		// read in image controller config from a JSON file
-		bundleConfig = jsonImageBundleConfig(configPath)
-	} else {
-		bundleConfig = defaultImageBundleConfig()
-	}
-
+// NewImageController returns a new ImageController initialised with default values.
+func NewImageController(logger *log.Logger) *ImageController {
 	controller := ImageController{
-		config: bundleConfig,
-		logger: logger,
+		ContentDir: defaultContentDir(),
+		Logger:     logger,
 	}
 	return &controller
 }
 
-// HandleUpload sadf
+// HandleUpload saves images from a multipart form submission to disk.
 func (ic *ImageController) HandleUpload() http.HandlerFunc {
 
 	// contents of this function taken from https://www.reddit.com/r/golang/comments/apf6l5/multiple_files_upload_using_gos_standard_library/
@@ -75,7 +54,7 @@ func (ic *ImageController) HandleUpload() http.HandlerFunc {
 		var part *multipart.Part
 
 		if mr, err = r.MultipartReader(); err != nil {
-			ic.logger.WithFields(log.Fields{
+			ic.Logger.WithFields(log.Fields{
 				"err": err.Error(),
 			}).Error("Error opening multipart reader")
 
@@ -91,16 +70,16 @@ func (ic *ImageController) HandleUpload() http.HandlerFunc {
 		// return an End of File when all parts have been read.
 		for {
 			// variables used in this loop only
-			// tempfile: filehandler for the temporary file
-			// filesize: how many bytes where written to the tempfile
+			// imgfile: filehandler for the temporary file
+			// filesize: how many bytes where written to the imgfile
 			// uploaded: boolean to flip when the end of a part is reached
-			var tempfile *os.File
+			var imgfile *os.File
 			var filesize int
 			var uploaded bool
 
 			if part, err = mr.NextPart(); err != nil {
 				if err != io.EOF {
-					ic.logger.WithFields(log.Fields{
+					ic.Logger.WithFields(log.Fields{
 						"err": err.Error(),
 					}).Error("Error occurred while fetching next part")
 
@@ -113,25 +92,26 @@ func (ic *ImageController) HandleUpload() http.HandlerFunc {
 				return
 			}
 
-			tempfile, err = ioutil.TempFile(os.TempDir(), "example-upload-*.tmp")
+			//imgfile, err = ioutil.TempFile(os.TempDir(), "example-upload-*.tmp")
+			fullImgFilePath := filepath.Join(ic.ContentDir, part.FileName())
+			imgfile, err = os.Create(fullImgFilePath)
 			if err != nil {
-				ic.logger.WithFields(log.Fields{
+				ic.Logger.WithFields(log.Fields{
 					"err": err.Error(),
-				}).Error("Error occurred while creating temp file")
+				}).Error("Error occurred while creating image file")
 
 				w.WriteHeader(500)
 				fmt.Fprintf(w, "Error occured during upload")
 				return
 			}
 			// defer tempfile close and removal.
-			defer tempfile.Close()
-			defer os.Remove(tempfile.Name())
+			defer imgfile.Close()
 
 			// continue reading until the whole file is upload or an error is reached
 			for !uploaded {
 				if n, err = part.Read(chunk); err != nil {
 					if err != io.EOF {
-						ic.logger.WithFields(log.Fields{
+						ic.Logger.WithFields(log.Fields{
 							"err": err.Error(),
 						}).Error("Error occurred reading chunk")
 
@@ -142,8 +122,8 @@ func (ic *ImageController) HandleUpload() http.HandlerFunc {
 					uploaded = true
 				}
 
-				if n, err = tempfile.Write(chunk[:n]); err != nil {
-					ic.logger.WithFields(log.Fields{
+				if n, err = imgfile.Write(chunk[:n]); err != nil {
+					ic.Logger.WithFields(log.Fields{
 						"err": err.Error(),
 					}).Error("Error occurred writing chunk to save file")
 
@@ -155,12 +135,12 @@ func (ic *ImageController) HandleUpload() http.HandlerFunc {
 			}
 
 			// Only print the name of the file, not the full filepath.
-			baseFileName := filepath.Base(tempfile.Name())
-			ic.logger.WithFields(log.Fields{
+			baseFileName := filepath.Base(imgfile.Name())
+			ic.Logger.WithFields(log.Fields{
 				"filename": baseFileName,
+				"fullpath": fullImgFilePath,
 				"size":     filesize,
 			}).Info("Image saved")
 		}
 	})
-
 }
