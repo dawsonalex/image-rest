@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dawsonalex/image-rest/internal/imageioutil"
 	"github.com/google/uuid"
 
 	log "github.com/sirupsen/logrus"
@@ -51,19 +52,6 @@ func (ic *ImageController) SetLogger(logger *log.Logger) {
 
 // TODO: Move getContentType and loadImageMetaData to imageioutil package.
 
-// getContentType returns the content-type of a file.
-func getContentType(f *os.File) (string, error) {
-	buffer := make([]byte, 512)
-
-	_, err := f.Read(buffer)
-	if err != nil {
-		return "", err
-	}
-
-	contentType := http.DetectContentType(buffer)
-	return contentType, nil
-}
-
 // loadImageMetaData gets a slice of images stored at the path of contentDir.
 func loadImageMetaData(contentDir string) ([]Image, error) {
 	images := make([]Image, 0)
@@ -72,11 +60,12 @@ func loadImageMetaData(contentDir string) ([]Image, error) {
 	err := filepath.Walk(contentDir, func(path string, fi os.FileInfo, err error) error {
 		if !fi.IsDir() {
 			file, err := os.Open(path)
+			defer file.Close()
 
 			// if there is an error it is of type *PathError
 			if err == nil {
-				if contentType, err := getContentType(file); err == nil {
-					if strings.Contains(contentType, "image/") {
+				if isImage, err := imageioutil.IsImageContentType(file); err == nil {
+					if isImage {
 						imageUUID, err := uuid.Parse(strings.TrimSuffix(fi.Name(), filepath.Ext(fi.Name())))
 						// TODO: these errors should return nil to skip the image struct creation
 						// and log a note that an image was skipped due to whatever error
@@ -86,7 +75,7 @@ func loadImageMetaData(contentDir string) ([]Image, error) {
 
 						imageURL, err := url.Parse(filepath.Join(path, fi.Name()))
 						if err != nil {
-							return err
+							return nil
 						}
 
 						image := Image{
