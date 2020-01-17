@@ -2,6 +2,7 @@ package imagebundle
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -14,6 +15,29 @@ import (
 
 	log "github.com/sirupsen/logrus"
 )
+
+var (
+	// ErrImageNotFound indicates that the requested image is not in the library.
+	ErrImageNotFound = errors.New("Image not in library")
+)
+
+// Describes a JSON response for a request for a single image.
+type imageResponse struct {
+	Name   string `json:"name"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+}
+
+// Describes a JSON response for a request for a group of images.
+type imageLibraryResponse struct {
+	Count   int                         `json:"count"`
+	Library map[uuid.UUID]imageResponse `json:"library"`
+}
+
+// Describes an error response.
+type errorResponse struct {
+	msg string `json:"msg"`
+}
 
 // ImageController contains a number of functions for handling requests
 // regarding images or image meta-data.
@@ -48,8 +72,8 @@ func (ic *ImageController) SetLogger(logger *log.Logger) {
 	ic.logger = logger
 }
 
-// HandleImageRequest returns image meta-data for the images in content directory.
-func (ic *ImageController) HandleImageRequest() http.HandlerFunc {
+// HandleLibraryRequest returns image meta-data for the images in content directory.
+func (ic *ImageController) HandleLibraryRequest() http.HandlerFunc {
 
 	// When the handler is initialised, read the images from content dir.
 	images, err := imagelibrary.FromDir(ic.ContentDir)
@@ -72,7 +96,23 @@ func (ic *ImageController) HandleImageRequest() http.HandlerFunc {
 
 	// return the HandlerFunc
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		bytes, err := json.Marshal(ic.images)
+		// Extract imagelibrary.Image values into our JSON response structs.
+		responseLibrary := make(map[uuid.UUID]imageResponse, len(ic.images))
+		for imgKey, img := range ic.images {
+			responseLibrary[imgKey] = imageResponse{
+				Name:   img.Name,
+				Width:  img.Width,
+				Height: img.Height,
+			}
+		}
+
+		response := imageLibraryResponse{
+			Count:   len(ic.images),
+			Library: responseLibrary,
+		}
+
+		// Marshal the JSON response struct and return
+		bytes, err := json.Marshal(response)
 		if err != nil {
 			ic.logger.WithFields(log.Fields{
 				"err": err,
@@ -83,11 +123,79 @@ func (ic *ImageController) HandleImageRequest() http.HandlerFunc {
 			return
 		}
 
-		responsePayload := string(bytes[:len(bytes)])
+		// Set the response body to our marshalled JSON
+		// and send.
+		responseBody := string(bytes[:len(bytes)])
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprintf(w, responsePayload)
+		fmt.Fprintf(w, responseBody)
 	})
+}
+
+// HandleImageRequest returns a handler func that manages requests for
+// an image or list of images from the image library.
+func (ic *ImageController) HandleImageRequest() http.HandlerFunc {
+
+	// When the handler is initialised, read the images from content dir.
+	images, err := imagelibrary.FromDir(ic.ContentDir)
+
+	if err != nil {
+		ic.images = make(map[uuid.UUID]*imagelibrary.Image, 0)
+		ic.logger.WithFields(log.Fields{
+			"contentDirectory": ic.ContentDir,
+			"err":              err,
+		}).Error("An error occurred loading images")
+	} else {
+		ic.images = make(map[uuid.UUID]*imagelibrary.Image, len(images))
+		for _, image := range images {
+			ic.images[uuid.New()] = image
+		}
+		ic.logger.WithFields(log.Fields{
+			"image-count": len(ic.images),
+		}).Info("Loaded images")
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestQuery := r.URL.Query()
+		imageID := requestQuery.Get("id")
+
+		// If imageID is present, fetch the
+		if len(imageID) > 0 {
+			image, err := ic.ImageByID(imageID)
+
+			// If the image isn't present, return some error JSON.
+			if err != nil {
+				errorResponse := errorResponse{
+					msg: err.Error(),
+				}
+
+				errorResponseJSON, _ := json.Marshal(errorResponse)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(404)
+				fmt.Fprintf(w, string(errorResponseJSON))
+				return
+			}
+
+			// If the image is found serve it.
+			http.ServeFile(w, r, image.AbsoluteURL)
+			return
+		}
+
+	})
+}
+
+// ImageByID returns an image from the library with matching ID.
+func (ic *ImageController) ImageByID(id string) (*imagelibrary.Image, error) {
+	imageUUID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, ErrImageNotFound
+	}
+
+	if image, found := ic.images[imageUUID]; !found {
+		return image, nil
+	} else {
+		return nil, ErrImageNotFound
+	}
 }
 
 // HandleUpload saves images from a multipart form submission to disk.

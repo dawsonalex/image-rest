@@ -36,7 +36,8 @@ func main() {
 	// Set up routes
 	router := http.NewServeMux()
 	router.HandleFunc("/upload", ic.HandleUpload())
-	router.HandleFunc("/images", ic.HandleImageRequest())
+	router.HandleFunc("/library", ic.HandleLibraryRequest())
+	router.HandleFunc("/image", ic.HandleImageRequest())
 
 	// Set up server
 	s := &http.Server{
