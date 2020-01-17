@@ -21,35 +21,6 @@ var (
 	ErrImageNotFound = errors.New("Image not in library")
 )
 
-// Describes a JSON response for a request for a single image.
-type imageResponse struct {
-	Name   string    `json:"name"`
-	Width  int       `json:"width"`
-	Height int       `json:"height"`
-	ID     uuid.UUID `json:"id"`
-}
-
-// Describes a JSON response for a request for a group of images.
-type imageLibraryResponse struct {
-	Count   int             `json:"count"`
-	Library []imageResponse `json:"library"`
-}
-
-// Describes an error response.
-type errorResponse struct {
-	Msg string `json:"msg"`
-}
-
-// ImageController contains a number of functions for handling requests
-// regarding images or image meta-data.
-type ImageController struct {
-	ContentDir  string `json:"contentDir"` // The path to content. Defaults to user HOME
-	images      map[uuid.UUID]*imagelibrary.Image
-	libraryInit bool // true if the image library has been loaded, otherwise false.
-
-	logger *log.Logger
-}
-
 func defaultContentDir() string {
 	contentDir, err := os.UserHomeDir()
 	if err != nil {
