@@ -6,12 +6,10 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/dawsonalex/image-rest/internal/imageioutil"
+	"github.com/dawsonalex/image-rest/internal/imagelibrary"
 	"github.com/google/uuid"
 
 	log "github.com/sirupsen/logrus"
@@ -21,7 +19,7 @@ import (
 // regarding images or image meta-data.
 type ImageController struct {
 	ContentDir string `json:"contentDir"` // The path to content. Defaults to user HOME
-	images     []Image
+	images     map[uuid.UUID]*imagelibrary.Image
 
 	logger *log.Logger
 }
@@ -40,7 +38,7 @@ func NewImageController(logger *log.Logger) *ImageController {
 	controller := ImageController{
 		ContentDir: defaultContentDir(),
 		logger:     logger,
-		images:     make([]Image, 0),
+		images:     make(map[uuid.UUID]*imagelibrary.Image),
 	}
 	return &controller
 }
@@ -50,62 +48,23 @@ func (ic *ImageController) SetLogger(logger *log.Logger) {
 	ic.logger = logger
 }
 
-// TODO: Move getContentType and loadImageMetaData to imageioutil package.
-
-// loadImageMetaData gets a slice of images stored at the path of contentDir.
-func loadImageMetaData(contentDir string) ([]Image, error) {
-	images := make([]Image, 0)
-
-	// walk the path from contentDir load meta-data for each image.
-	err := filepath.Walk(contentDir, func(path string, fi os.FileInfo, err error) error {
-		if !fi.IsDir() {
-			file, err := os.Open(path)
-			defer file.Close()
-
-			// if there is an error it is of type *PathError
-			if err == nil {
-				if isImage, err := imageioutil.IsImageContentType(file); err == nil {
-					if isImage {
-						imageUUID, err := uuid.Parse(strings.TrimSuffix(fi.Name(), filepath.Ext(fi.Name())))
-						// TODO: these errors should return nil to skip the image struct creation
-						// and log a note that an image was skipped due to whatever error
-						if err != nil {
-							return err
-						}
-
-						imageURL, err := url.Parse(filepath.Join(path, fi.Name()))
-						if err != nil {
-							return nil
-						}
-
-						image := Image{
-							Name:        file.Name(),
-							AbsoluteURL: imageURL,
-							ID:          imageUUID,
-						}
-						images = append(images, image)
-					}
-				}
-			}
-		}
-		return nil
-	})
-
-	return images, err
-}
-
 // HandleImageRequest returns image meta-data for the images in content directory.
 func (ic *ImageController) HandleImageRequest() http.HandlerFunc {
 
 	// When the handler is initialised, read the images from content dir.
-	images, err := loadImageMetaData(ic.ContentDir)
+	images, err := imagelibrary.FromDir(ic.ContentDir)
+
 	if err != nil {
+		ic.images = make(map[uuid.UUID]*imagelibrary.Image, 0)
 		ic.logger.WithFields(log.Fields{
 			"contentDirectory": ic.ContentDir,
 			"err":              err,
 		}).Error("An error occurred loading images")
 	} else {
-		ic.images = images
+		ic.images = make(map[uuid.UUID]*imagelibrary.Image, len(images))
+		for _, image := range images {
+			ic.images[uuid.New()] = image
+		}
 		ic.logger.WithFields(log.Fields{
 			"image-count": len(ic.images),
 		}).Info("Loaded images")

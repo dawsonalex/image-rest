@@ -1,88 +1,65 @@
 package imagelibrary
 
 import (
+	"image"
+	_ "image/gif"  // Register gif image decoding
+	_ "image/jpeg" // Register jpeg image decoding
+	_ "image/png"  // Register PNG image decoding
+	"io/ioutil"
+	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+)
 
-	log "github.com/sirupsen/logrus"
-
-	"github.com/google/uuid"
+const (
+	// ImageContentType is the content type prefix for images.
+	ImageContentType string = "image/"
 )
 
 type (
 	// Image is an implementation of an image file on disk
 	Image struct {
-		Name        string    `json:"name"`
-		AbsoluteURL *url.URL  `json:"url"`
-		Width       int       `json:"width"`
-		Height      int       `json:"height"`
-		UUID        uuid.UUID `json:"id"`
+		Name        string `json:"name"`
+		Width       int    `json:"width"`
+		Height      int    `json:"height"`
+		AbsoluteURL string
 	}
 )
 
-// FromDir loads the library images from a directory on disk.
-func FromDir(imageDir string) *ImageLibrary {
-	images, err := imageSliceFromDir(imageDir)
-
-	// make images as an empty slice if an error occurred
+// FromDir returns a slice of images at the path dir.
+func FromDir(dir string) ([]*Image, error) {
+	files, err := ioutil.ReadDir(dir)
 	if err != nil {
-		images = make([]Image, 0)
+		return make([]*Image, 0), err
 	}
 
-	library := ImageLibrary{
-		images,
-		log.New(),
-	}
-	return &library
-}
-
-// ImageLibrary loads and stores meta-data on images from disk in memory.
-type ImageLibrary struct {
-	Images []Image
-	logger *log.Logger
-}
-
-// SetLogger sets the logger object on the ImageLibrary.
-func (il *ImageLibrary) SetLogger(logger *log.Logger) {
-	il.logger = logger
-}
-
-// TODO: us ioutil.ReadDir to iterate the directory and get files. Then file.Stat and DecodeConfig to get other details.
-
-func imageSliceFromDir(dir string) ([]Image, error) {
-	images := make([]Image, 0)
-	createImage := func(path string, fi os.FileInfo, err error) error {
-		if !fi.IsDir() {
-			file, err := os.Open(path)
-			defer file.Close()
-
-			if err == nil {
-				if isImage, _ := isImageContentType(file); isImage {
-
-					images = append(images, image)
-				}
+	imageSlice := make([]*Image, 0)
+	log.Println(len(files))
+	for _, img := range files {
+		fullFilePath := filepath.Join(dir, img.Name())
+		if reader, err := os.Open(fullFilePath); err == nil {
+			defer reader.Close()
+			imgConfig, _, err := image.DecodeConfig(reader)
+			if err != nil {
+				log.Printf("%s err: %v\n", fullFilePath, err)
+				continue
 			}
+
+			imageFile := Image{
+				AbsoluteURL: fullFilePath,
+				Name:        img.Name(),
+				Width:       imgConfig.Width,
+				Height:      imgConfig.Height,
+			}
+			imageSlice = append(imageSlice, &imageFile)
+		} else {
+			log.Printf("%s err: %v\n", fullFilePath, err)
 		}
-
-		return nil
 	}
 
-	err := filepath.Walk(dir, createImage)
-	return images, err
-}
-
-func imageFromFile(file *os.File) Image {
-	imageUUID := uuid.New()
-	imageURL, _ := url.Parse(filepath.Join(path, file.Name()))
-
-	image := Image{
-		UUID:        imageUUID,
-		AbsoluteURL: imageURL,
-		Name:        fi.Name(),
-	}
+	return imageSlice, nil
 }
 
 // isImageContentType returns true file the file contents is an image MIME-type.
@@ -96,6 +73,6 @@ func isImageContentType(f *os.File) (bool, error) {
 	}
 
 	contentType := http.DetectContentType(buffer)
-	isImage := strings.Contains(contentType, "image/")
+	isImage := strings.Contains(contentType, ImageContentType)
 	return isImage, nil
 }
