@@ -23,27 +23,29 @@ var (
 
 // Describes a JSON response for a request for a single image.
 type imageResponse struct {
-	Name   string `json:"name"`
-	Width  int    `json:"width"`
-	Height int    `json:"height"`
+	Name   string    `json:"name"`
+	Width  int       `json:"width"`
+	Height int       `json:"height"`
+	ID     uuid.UUID `json:"id"`
 }
 
 // Describes a JSON response for a request for a group of images.
 type imageLibraryResponse struct {
-	Count   int                         `json:"count"`
-	Library map[uuid.UUID]imageResponse `json:"library"`
+	Count   int             `json:"count"`
+	Library []imageResponse `json:"library"`
 }
 
 // Describes an error response.
 type errorResponse struct {
-	msg string `json:"msg"`
+	Msg string `json:"msg"`
 }
 
 // ImageController contains a number of functions for handling requests
 // regarding images or image meta-data.
 type ImageController struct {
-	ContentDir string `json:"contentDir"` // The path to content. Defaults to user HOME
-	images     map[uuid.UUID]*imagelibrary.Image
+	ContentDir  string `json:"contentDir"` // The path to content. Defaults to user HOME
+	images      map[uuid.UUID]*imagelibrary.Image
+	libraryInit bool // true if the image library has been loaded, otherwise false.
 
 	logger *log.Logger
 }
@@ -72,9 +74,8 @@ func (ic *ImageController) SetLogger(logger *log.Logger) {
 	ic.logger = logger
 }
 
-// HandleLibraryRequest returns image meta-data for the images in content directory.
-func (ic *ImageController) HandleLibraryRequest() http.HandlerFunc {
-
+// InitLibrary creates an image library pointing to dir.
+func (ic *ImageController) InitLibrary(dir string) {
 	// When the handler is initialised, read the images from content dir.
 	images, err := imagelibrary.FromDir(ic.ContentDir)
 
@@ -94,16 +95,28 @@ func (ic *ImageController) HandleLibraryRequest() http.HandlerFunc {
 		}).Info("Loaded images")
 	}
 
+	ic.libraryInit = true
+}
+
+// HandleLibraryRequest returns image meta-data for the images in content directory.
+func (ic *ImageController) HandleLibraryRequest() http.HandlerFunc {
+	if !ic.libraryInit {
+		ic.InitLibrary(ic.ContentDir)
+	}
+
 	// return the HandlerFunc
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Extract imagelibrary.Image values into our JSON response structs.
-		responseLibrary := make(map[uuid.UUID]imageResponse, len(ic.images))
+		responseLibrary := make([]imageResponse, 0)
 		for imgKey, img := range ic.images {
-			responseLibrary[imgKey] = imageResponse{
+			image := imageResponse{
 				Name:   img.Name,
 				Width:  img.Width,
 				Height: img.Height,
+				ID:     imgKey,
 			}
+
+			responseLibrary = append(responseLibrary, image)
 		}
 
 		response := imageLibraryResponse{
@@ -135,24 +148,8 @@ func (ic *ImageController) HandleLibraryRequest() http.HandlerFunc {
 // HandleImageRequest returns a handler func that manages requests for
 // an image or list of images from the image library.
 func (ic *ImageController) HandleImageRequest() http.HandlerFunc {
-
-	// When the handler is initialised, read the images from content dir.
-	images, err := imagelibrary.FromDir(ic.ContentDir)
-
-	if err != nil {
-		ic.images = make(map[uuid.UUID]*imagelibrary.Image, 0)
-		ic.logger.WithFields(log.Fields{
-			"contentDirectory": ic.ContentDir,
-			"err":              err,
-		}).Error("An error occurred loading images")
-	} else {
-		ic.images = make(map[uuid.UUID]*imagelibrary.Image, len(images))
-		for _, image := range images {
-			ic.images[uuid.New()] = image
-		}
-		ic.logger.WithFields(log.Fields{
-			"image-count": len(ic.images),
-		}).Info("Loaded images")
+	if !ic.libraryInit {
+		ic.InitLibrary(ic.ContentDir)
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -165,8 +162,13 @@ func (ic *ImageController) HandleImageRequest() http.HandlerFunc {
 
 			// If the image isn't present, return some error JSON.
 			if err != nil {
+				ic.logger.WithFields(log.Fields{
+					"value": imageID,
+					"err":   err,
+				}).Error("Error getting image")
+
 				errorResponse := errorResponse{
-					msg: err.Error(),
+					Msg: err.Error(),
 				}
 
 				errorResponseJSON, _ := json.Marshal(errorResponse)
@@ -177,6 +179,9 @@ func (ic *ImageController) HandleImageRequest() http.HandlerFunc {
 			}
 
 			// If the image is found serve it.
+			ic.logger.WithFields(log.Fields{
+				"id": imageID,
+			}).Info("Responding with image")
 			http.ServeFile(w, r, image.AbsoluteURL)
 			return
 		}
@@ -191,11 +196,10 @@ func (ic *ImageController) ImageByID(id string) (*imagelibrary.Image, error) {
 		return nil, ErrImageNotFound
 	}
 
-	if image, found := ic.images[imageUUID]; !found {
+	if image, found := ic.images[imageUUID]; found {
 		return image, nil
-	} else {
-		return nil, ErrImageNotFound
 	}
+	return nil, ErrImageNotFound
 }
 
 // HandleUpload saves images from a multipart form submission to disk.

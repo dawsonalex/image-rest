@@ -36,14 +36,12 @@ func FromDir(dir string) ([]*Image, error) {
 	}
 
 	imageSlice := make([]*Image, 0)
-	log.Println(len(files))
 	for _, img := range files {
 		fullFilePath := filepath.Join(dir, img.Name())
 		if reader, err := os.Open(fullFilePath); err == nil {
 			defer reader.Close()
 			imgConfig, _, err := image.DecodeConfig(reader)
 			if err != nil {
-				log.Printf("%s err: %v\n", fullFilePath, err)
 				continue
 			}
 
