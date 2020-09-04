@@ -1,35 +1,30 @@
 package main
 
 import (
-	"fmt"
+	"context"
+	"flag"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dawsonalex/image-rest/internal/bundles/imagebundle"
-	"github.com/dawsonalex/image-rest/pkg/logware"
-	"github.com/jessevdk/go-flags"
 )
 
-var options struct {
-	// Path to log file.
-	LogPath string `short:"l" long:"log" default:"log/img-rest.log" description:"The path to the log file."`
-
-	// Path to directory to serve
-	ImgDir string `short:"d" long:"dir" default:"." description:"The path to the directory to serve images from."`
-}
+var (
+	logger = logrus.New()
+)
 
 func main() {
-	// init logger
-	logger := logware.NewStdOutLogger()
-
-	parseArgs(logger)
+	var mountDir = flag.String("dir", defaultDir(), "the path of the directory to watch")
+	flag.Parse()
 
 	// Declare image controller
 	ic := &imagebundle.ImageController{
-		ContentDir: options.ImgDir,
+		ContentDir: *mountDir,
 	}
 	ic.SetLogger(logger)
 
@@ -42,51 +37,63 @@ func main() {
 	// Set up server
 	s := &http.Server{
 		Addr:    ":8080",
-		Handler: logware.LogRoute(logger, router),
+		Handler: logRoute(router),
 	}
-	logger.WithFields(log.Fields{
-		"port": s.Addr,
-	}).Info("Waiting for requests")
+	// start the server log errors.
+	go func() {
+		if err := s.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("Error starting server: %v", err)
+		} else {
+			logger.WithFields(log.Fields{
+				"port": s.Addr,
+			}).Info("Waiting for requests")
+		}
+	}()
 
-	log.Fatal(s.ListenAndServe())
+	// await SIGINT from the OS, then cleanup.
+	awaitInterrupt(func(done chan struct{}) {
+		if err := s.Shutdown(context.Background()); err != nil {
+			panic(err)
+		}
+		done <- struct{}{}
+	})
 }
 
-// Parse command line arguments and log messages
-func parseArgs(logger *log.Logger) {
-	_, err := flags.NewParser(&options, flags.HelpFlag).Parse()
+// logRoute is middleware for a server to log HTTP data about a
+// request made to the server.
+func logRoute(f http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Log request details including reseponse.
+		logger.WithFields(log.Fields{
+			"protocol": r.Proto,
+			"method":   r.Method,
+			"route":    r.URL,
+		}).Info("Request received")
+
+		f.ServeHTTP(w, r)
+	}
+}
+
+// awaitInterrupt blocks execution until it receives a SIGNINT
+// from the OS.
+func awaitInterrupt(onInterrupt func(chan struct{})) {
+	done := make(chan struct{})
+	go func() {
+		sigchan := make(chan os.Signal, 1)
+		signal.Notify(sigchan, os.Interrupt)
+		defer signal.Stop(sigchan)
+
+		<-sigchan
+		logger.Println("Shutting down")
+		onInterrupt(done)
+	}()
+	<-done
+}
+
+func defaultDir() string {
+	ex, err := os.Executable()
 	if err != nil {
-		flagError, _ := err.(*flags.Error)
-		switch flagError.Type {
-		// ErrHelp message contains the help page.
-		case flags.ErrHelp:
-			// Print the help message as-is and exit.
-			logger.Print(flagError.Message)
-			os.Exit(0)
-
-		// Fatal errors parsing args, end program.
-		case flags.ErrRequired,
-			flags.ErrExpectedArgument:
-			logger.Fatal(flagError.Message)
-
-		// Non-fatal errors, warn and continue.
-		default:
-			logger.Warn("There was an error parsing arguements. Check your config is correct below.")
-		}
+		log.Fatal(err)
 	}
-
-	// If the imagedir path is default, set it to dir of
-	// the executable that started the process.
-	if options.ImgDir == "." {
-		ex, err := os.Executable()
-		if err != nil {
-			logger.Panicln(err)
-		}
-		exPath := filepath.Dir(ex)
-		options.ImgDir = exPath
-	}
-
-	optionsString := fmt.Sprintf("%+v", options)
-	logger.WithFields(log.Fields{
-		"args": optionsString,
-	}).Info("Parsed args")
+	return filepath.Dir(ex)
 }
