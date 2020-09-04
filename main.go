@@ -10,8 +10,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/dawsonalex/image-rest/internal/bundles/imagebundle"
 )
 
 var (
@@ -19,26 +17,14 @@ var (
 )
 
 func main() {
-	var mountDir = flag.String("dir", defaultDir(), "the path of the directory to watch")
+	//var mountDir = flag.String("dir", defaultDir(), "the path of the directory to watch")
 
 	flag.Parse()
 
-	// Declare image controller
-	ic := &imagebundle.ImageController{
-		ContentDir: *mountDir,
-	}
-	ic.SetLogger(logger)
-
-	// Set up routes
-	router := http.NewServeMux()
-	router.HandleFunc("/upload", ic.HandleUpload())
-	router.HandleFunc("/library", ic.HandleLibraryRequest())
-	router.HandleFunc("/image", ic.HandleImageRequest())
-
 	// Set up server
 	s := &http.Server{
-		Addr:    ":8080",
-		Handler: logRoute(router),
+		Addr: ":8080",
+		//Handler: logRoute(router),
 	}
 	// start the server log errors.
 	go func() {
