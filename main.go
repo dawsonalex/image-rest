@@ -20,6 +20,7 @@ var (
 
 func main() {
 	var mountDir = flag.String("dir", defaultDir(), "the path of the directory to watch")
+
 	flag.Parse()
 
 	// Declare image controller
@@ -43,12 +44,9 @@ func main() {
 	go func() {
 		if err := s.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("Error starting server: %v", err)
-		} else {
-			logger.WithFields(log.Fields{
-				"port": s.Addr,
-			}).Info("Waiting for requests")
 		}
 	}()
+	logger.WithField("addr", s.Addr).Info("Starting image server")
 
 	// await SIGINT from the OS, then cleanup.
 	awaitInterrupt(func(done chan struct{}) {
