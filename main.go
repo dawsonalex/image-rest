@@ -8,6 +8,9 @@ import (
 	"os/signal"
 	"path/filepath"
 
+	"github.com/dawsonalex/image-rest/server"
+
+	"github.com/dawsonalex/image-rest/imageservice"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
@@ -17,22 +20,31 @@ var (
 )
 
 func main() {
-	//var mountDir = flag.String("dir", defaultDir(), "the path of the directory to watch")
+	var mountDir = flag.String("dir", defaultDir(), "the path of the directory to watch")
 
 	flag.Parse()
 
+	service := imageservice.New(logger)
+	err := service.Watch(*mountDir)
+	if err != nil {
+		logger.Fatalf("error watching dir %s: %v", *mountDir, err)
+	}
+
+	router := http.NewServeMux()
+	router.HandleFunc("/files", server.FilesHandler(service, logger))
+
 	// Set up server
 	s := &http.Server{
-		Addr: ":8080",
-		//Handler: logRoute(router),
+		Addr:    ":8080",
+		Handler: logRoute(router),
 	}
 	// start the server log errors.
 	go func() {
 		if err := s.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("Error starting server: %v", err)
+			logger.Fatalf("Error starting server: %v", err)
 		}
 	}()
-	logger.WithField("addr", s.Addr).Info("Starting image server")
+	logger.WithField("port", s.Addr).Info("Starting listening for requests")
 
 	// await SIGINT from the OS, then cleanup.
 	awaitInterrupt(func(done chan struct{}) {
