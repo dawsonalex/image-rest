@@ -6,6 +6,7 @@ import (
 	_ "image/jpeg" // Register jpeg image decoding
 	_ "image/png"  // Register PNG image decoding
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -19,9 +20,11 @@ const imageContentType string = "image/"
 // Service defines a structure for watching a directory for image files changes,
 // and getting the images in the directory.
 type Service struct {
-	log   *logrus.Logger
-	list  ImageList
-	mutex sync.RWMutex
+	log     *logrus.Logger
+	list    ImageList
+	mutex   sync.RWMutex
+	watcher *fsnotify.Watcher
+	stop    chan struct{}
 }
 
 // Image represents an image on disk.
@@ -43,6 +46,8 @@ func New(logger *logrus.Logger) *Service {
 	}
 }
 
+// loadFiles reads the dirctory `dir` and returns a list
+// images it contains.
 func loadFiles(dir string) (ImageList, error) {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -90,21 +95,24 @@ func (s *Service) Watch(dir string) error {
 	s.list = images
 
 	// begin watching the directory for changes
-	watcher, err := fsnotify.NewWatcher()
+	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
 	}
-	defer watcher.Close()
+	s.watcher = w
 
-	if err = watcher.Add(dir); err != nil {
+	if err = s.watcher.Add(dir); err != nil {
 		return err
 	}
 	go func() {
 		for {
 			select {
-			case event := <-watcher.Events:
+			case event := <-s.watcher.Events:
 				s.handleEvent(event)
-				// TODO: decide on watcher.Errors handling
+			case err := <-s.watcher.Errors:
+				log.Println("[ERROR]", err)
+			case <-s.stop:
+				return
 			}
 		}
 	}()
@@ -112,9 +120,18 @@ func (s *Service) Watch(dir string) error {
 	return nil
 }
 
+// Stop makes the service finish watching the directory, and
+// cleanup resources.
+func (s *Service) Stop() {
+	s.log.Println("stopping image service")
+	s.stop <- struct{}{}
+	s.watcher.Close()
+}
+
 func (s *Service) add(filename string) {
 	image, err := loadImage(filename)
 	if err != nil {
+		s.log.Errorf("error loading image %s: %v", filename, err)
 		return
 	}
 	s.mutex.Lock()
@@ -131,9 +148,11 @@ func (s *Service) remove(filename string) {
 func (s *Service) handleEvent(event fsnotify.Event) {
 	switch event.Op {
 	case fsnotify.Create:
+		s.log.Printf("handling event %v on %s", event.Op, event.Name)
 		s.add(event.Name)
 	case fsnotify.Remove, fsnotify.Rename:
-		//TODO: implement remove functionality.
+		s.log.Printf("handling event %v on %s", event.Op, event.Name)
+		s.remove(event.Name)
 	}
 }
 

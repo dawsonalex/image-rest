@@ -48,6 +48,7 @@ func main() {
 
 	// await SIGINT from the OS, then cleanup.
 	awaitInterrupt(func(done chan struct{}) {
+		service.Stop()
 		if err := s.Shutdown(context.Background()); err != nil {
 			panic(err)
 		}
@@ -80,8 +81,9 @@ func awaitInterrupt(onInterrupt func(chan struct{})) {
 		defer signal.Stop(sigchan)
 
 		<-sigchan
-		logger.Println("Shutting down")
+		logger.Println("received sigint")
 		onInterrupt(done)
+		logger.Println("shutdown.")
 	}()
 	<-done
 }
