@@ -6,7 +6,6 @@ import (
 	_ "image/jpeg" // Register jpeg image decoding
 	_ "image/png"  // Register PNG image decoding
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -110,7 +109,7 @@ func (s *Service) Watch(dir string) error {
 			case event := <-s.watcher.Events:
 				s.handleEvent(event)
 			case err := <-s.watcher.Errors:
-				log.Println("[ERROR]", err)
+				s.log.Errorln(err)
 			case <-s.stop:
 				return
 			}
@@ -134,12 +133,14 @@ func (s *Service) add(filename string) {
 		s.log.Errorf("error loading image %s: %v", filename, err)
 		return
 	}
+	s.log.Debugf("adding image %s", filename)
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.list[image.Name] = *image
 }
 
 func (s *Service) remove(filename string) {
+	s.log.Debugf("removing %s", filename)
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	delete(s.list, filepath.Base(filename))
