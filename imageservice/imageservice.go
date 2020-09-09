@@ -105,13 +105,19 @@ func (s *Service) Watch(dir string) error {
 	}
 	go func() {
 		for {
+			s.log.Trace("running over watcher channels")
 			select {
-			case event := <-s.watcher.Events:
+			case event, ok := <-s.watcher.Events:
+				if !ok {
+					return
+				}
+				s.log.Debugf("got event for %s", event.Name)
 				s.handleEvent(event)
-			case err := <-s.watcher.Errors:
+			case err, ok := <-s.watcher.Errors:
+				if !ok {
+					return
+				}
 				s.log.Errorln(err)
-			case <-s.stop:
-				return
 			}
 		}
 	}()
@@ -123,7 +129,6 @@ func (s *Service) Watch(dir string) error {
 // cleanup resources.
 func (s *Service) Stop() {
 	s.log.Println("stopping image service")
-	s.stop <- struct{}{}
 	s.watcher.Close()
 }
 

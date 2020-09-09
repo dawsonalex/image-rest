@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,19 +16,30 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const defaultLogLevel = logrus.InfoLevel
+
 var (
-	logger = logrus.New()
+	logger   *logrus.Logger
+	mountDir string
+	logLevel logrus.Level
 )
 
-func main() {
-	var mountDir = flag.String("dir", defaultDir(), "the path of the directory to watch")
-
+func init() {
+	flag.StringVar(&mountDir, "dir", defaultDir(), "the path of the directory to watch")
+	logLevelHelp := fmt.Sprintf("The level of logging to use, must be one of (%v)", logrus.AllLevels)
+	var logLevelParam string
+	flag.StringVar(&logLevelParam, "l", defaultLogLevel.String(), logLevelHelp)
 	flag.Parse()
 
+	logger = initLogger(logLevelParam)
+}
+
+func main() {
+
 	service := imageservice.New(logger)
-	err := service.Watch(*mountDir)
+	err := service.Watch(mountDir)
 	if err != nil {
-		logger.Fatalf("error watching dir %s: %v", *mountDir, err)
+		logger.Fatalf("error watching dir %s: %v", mountDir, err)
 	}
 
 	router := http.NewServeMux()
@@ -54,6 +66,19 @@ func main() {
 		}
 		done <- struct{}{}
 	})
+}
+
+func initLogger(level string) *logrus.Logger {
+	logger := logrus.New()
+	if logLevel, err := logrus.ParseLevel(level); err != nil {
+		fmt.Printf("error during log init: %v\n", err)
+		fmt.Println("using default log level 'info'")
+		logger.SetLevel(defaultLogLevel)
+	} else {
+		fmt.Println("using log level: ", logLevel.String())
+		logger.SetLevel(logLevel)
+	}
+	return logger
 }
 
 // logRoute is middleware for a server to log HTTP data about a
