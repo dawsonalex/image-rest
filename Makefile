@@ -1,8 +1,15 @@
-build:
-	go build
+LOGLEVEL ?= debug
+WATCHDIR ?= ./sample_images
 
 run: 
-	go run main.go -dir=./sample_images
+	GOOS=linux GOARCH=amd64 go build -o bin/imageservice
+	bin/imageservice -dir=$(WATCHDIR) -l=$(LOGLEVEL) &
+
+stop:
+	pkill -f imageservice
+
+clean:
+	rm -rv bin/
 
 test: 
 	go test ./...
