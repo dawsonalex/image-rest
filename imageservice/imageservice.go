@@ -109,7 +109,6 @@ func (s *Service) Watch(dir string) error {
 			if !ok {
 				return
 			}
-			s.log.Debugf("imageservice.Watch(): got event for %s", event.Name)
 			s.handleEvent(event)
 		}
 	}()
