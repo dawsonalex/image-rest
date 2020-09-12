@@ -43,8 +43,9 @@ func main() {
 	}
 
 	router := http.NewServeMux()
-	router.HandleFunc("/files", server.FilesHandler(service, logger))
+	router.HandleFunc("/list", server.FilesHandler(service, logger))
 	router.HandleFunc("/upload", server.UploadHandler(mountDir, logger))
+	router.HandleFunc("/remove", server.RemoveHandler(mountDir, logger))
 
 	// Set up server
 	s := &http.Server{

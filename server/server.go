@@ -46,9 +46,39 @@ func sortFiles(images []imageservice.Image) []imageservice.Image {
 	return images
 }
 
+// RemoveHandler handlers requests to a delete a file from the server.
+func RemoveHandler(dir string, logger *logrus.Logger) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !(r.Method == http.MethodGet) {
+			logger.Errorf("Invalid HTTP method, got: %v", r.Method)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		// TODO: Need to ensure filenames don't have subfolders in,
+		//otherwise user could delete files from anywhere in the target system.
+		filenames := r.URL.Query()["name"]
+		for _, file := range filenames {
+			fullpath := filepath.Join(dir, file)
+			err := os.Remove(fullpath)
+			if err != nil {
+				fmt.Fprint(w, "error removing files")
+				w.WriteHeader(http.StatusInternalServerError)
+				logger.Errorf("RemoveHandler(): error deleting file %s: %v", fullpath, err)
+			}
+		}
+	})
+}
+
 // UploadHandler handles requests to upload files to the server.
 func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !(r.Method == http.MethodPost) {
+			logger.Errorf("Invalid HTTP method, got: %v", r.Method)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
 		// define some variables used throughout the function
 		// n: for keeping track of bytes read and written
 		// err: for storing errors that need checking
