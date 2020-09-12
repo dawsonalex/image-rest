@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/dawsonalex/image-rest/imageservice"
 	"github.com/sirupsen/logrus"
@@ -60,7 +61,6 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 
 		if mr, err = r.MultipartReader(); err != nil {
 			logger.Errorf("Error opening multipart reader: %v", err)
-
 			w.WriteHeader(500)
 			fmt.Fprintf(w, "Error occured during upload")
 			return
@@ -102,6 +102,7 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 			}
 			defer imgfile.Close()
 
+			contentTypeChecked := false
 			// Read in the next chunk
 			for !uploaded {
 				// If we get an error reading the chunk EOF indicates chunk is done
@@ -115,6 +116,20 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 						return
 					}
 					uploaded = true
+				}
+
+				// If we haven't tested the content type of the actual file,
+				// do it now. Stop the upload if the file isn't an image.
+				if !contentTypeChecked {
+					contentType := http.DetectContentType(chunk)
+					logger.Debugf("UploadHandler(): got image of content type %s", contentType)
+					isImage := strings.Contains(contentType, "image/")
+					if !isImage {
+						logger.Errorf("HandleUpload(): attempted to upload non-image file - %s", imgfile.Name())
+						http.Error(w, "Request content is not an image", http.StatusBadRequest)
+						return
+					}
+					contentTypeChecked = true
 				}
 
 				// Write the bytes we read from the part into the chunk to
