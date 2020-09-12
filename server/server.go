@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/dawsonalex/image-rest/imageservice"
 	"github.com/sirupsen/logrus"
@@ -28,11 +29,20 @@ func FilesHandler(store *imageservice.Service, logger *logrus.Logger) http.Handl
 		for _, image := range images {
 			imageResponse = append(imageResponse, image)
 		}
+		imageResponse = sortFiles(imageResponse)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(imageResponse)
 	})
+}
+
+// softFiles sorts image
+func sortFiles(images []imageservice.Image) []imageservice.Image {
+	sort.SliceStable(images, func(i, j int) bool {
+		return images[i].Name < images[j].Name
+	})
+	return images
 }
 
 // UploadHandler handles requests to upload files to the server.
