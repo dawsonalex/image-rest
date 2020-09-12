@@ -105,19 +105,23 @@ func (s *Service) Watch(dir string) error {
 	}
 	go func() {
 		for {
-			s.log.Trace("running over watcher channels")
-			select {
-			case event, ok := <-s.watcher.Events:
-				if !ok {
-					return
-				}
-				s.log.Debugf("got event for %s", event.Name)
-				s.handleEvent(event)
-			case err, ok := <-s.watcher.Errors:
-				if !ok {
-					return
-				}
-				s.log.Errorln(err)
+			event, ok := <-s.watcher.Events
+			if !ok {
+				return
+			}
+			s.log.Debugf("imageservice.Watch(): got event for %s", event.Name)
+			s.handleEvent(event)
+		}
+	}()
+
+	go func() {
+		for {
+			err, ok := <-s.watcher.Errors
+			if !ok {
+				return
+			}
+			if err != nil {
+				s.log.Errorf("imageservice.Watch(): %v", err)
 			}
 		}
 	}()
@@ -128,24 +132,24 @@ func (s *Service) Watch(dir string) error {
 // Stop makes the service finish watching the directory, and
 // cleanup resources.
 func (s *Service) Stop() {
-	s.log.Println("stopping image service")
+	s.log.Println("imageservice.Stop(): stopping image service")
 	s.watcher.Close()
 }
 
 func (s *Service) add(filename string) {
 	image, err := loadImage(filename)
 	if err != nil {
-		s.log.Errorf("error loading image %s: %v", filename, err)
+		s.log.Errorf("imageservice.add(): error loading image %s: %v", filename, err)
 		return
 	}
-	s.log.Debugf("adding image %s", filename)
+	s.log.Debugf("imageservice.add(): adding image %s", filename)
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.list[image.Name] = *image
 }
 
 func (s *Service) remove(filename string) {
-	s.log.Debugf("removing %s", filename)
+	s.log.Debugf("imageservice.remove(): removing %s", filename)
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	delete(s.list, filepath.Base(filename))
@@ -154,10 +158,10 @@ func (s *Service) remove(filename string) {
 func (s *Service) handleEvent(event fsnotify.Event) {
 	switch event.Op {
 	case fsnotify.Create:
-		s.log.Printf("handling event %v on %s", event.Op, event.Name)
+		s.log.Printf("imageservice.handleEvent(): handling event %v on %s", event.Op, event.Name)
 		s.add(event.Name)
 	case fsnotify.Remove, fsnotify.Rename:
-		s.log.Printf("handling event %v on %s", event.Op, event.Name)
+		s.log.Printf("imageservice.handleEvent(): handling event %v on %s", event.Op, event.Name)
 		s.remove(event.Name)
 	}
 }
