@@ -49,17 +49,21 @@ func sortFiles(images []imageservice.Image) []imageservice.Image {
 // RemoveHandler handlers requests to a delete a file from the server.
 func RemoveHandler(dir string, logger *logrus.Logger) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !(r.Method == http.MethodGet) {
+		if !(r.Method == http.MethodDelete) {
 			logger.Errorf("Invalid HTTP method, got: %v", r.Method)
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
 
-		// TODO: Need to ensure filenames don't have subfolders in,
-		//otherwise user could delete files from anywhere in the target system.
 		filenames := r.URL.Query()["name"]
 		for _, file := range filenames {
-			fullpath := filepath.Join(dir, file)
+			if filepath.Dir(file) != "." {
+				logger.Debugf("invalid remove request for filename: %s", file)
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprint(w, "name param should only contain a file name.")
+				return
+			}
+			fullpath := filepath.Join(dir, filepath.Base(file))
 			err := os.Remove(fullpath)
 			if err != nil {
 				fmt.Fprint(w, "error removing files")
