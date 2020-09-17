@@ -1,8 +1,10 @@
 LOGLEVEL ?= debug
 WATCHDIR ?= ./sample_images
 
-run: 
-	GOOS=linux GOARCH=amd64 go build -o bin/imageservice
+build:
+	go build -o bin/imageservice
+
+run: build
 	bin/imageservice -dir=$(WATCHDIR) -l=$(LOGLEVEL) &
 
 stop:
