@@ -102,14 +102,11 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 
 		// buffer to be used for reading bytes from files
 		chunk := make([]byte, 4096)
+		fileBytes := make([]byte, 0)
 
+		contentTypeChecked := false
 		for {
-			// variables used in this loop only
-			// imgfile: filehandler for the temporary file
-			// filesize: how many bytes where written to the imgfile
-			// uploaded: boolean to flip when the end of a part is reached
-			var imgfile *os.File
-			var filesize int
+			// flag for tracking when the end of a part is reached.
 			var uploaded bool
 
 			if part, err = mr.NextPart(); err != nil {
@@ -125,18 +122,6 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 				return
 			}
 
-			imgPath := filepath.Join(uploadDir, part.FileName())
-			imgfile, err = os.Create(imgPath)
-			if err != nil {
-				logger.Errorf("Error occurred while creating image file: %v", err)
-
-				w.WriteHeader(500)
-				fmt.Fprintf(w, "Error occured during upload")
-				return
-			}
-			defer imgfile.Close()
-
-			contentTypeChecked := false
 			// Read in the next chunk
 			for !uploaded {
 				// If we get an error reading the chunk EOF indicates chunk is done
@@ -159,29 +144,40 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 					logger.Debugf("UploadHandler(): got image of content type %s", contentType)
 					isImage := strings.Contains(contentType, "image/")
 					if !isImage {
-						logger.Errorf("HandleUpload(): attempted to upload non-image file - %s", imgfile.Name())
+						logger.Errorf("HandleUpload(): attempted to upload non-image file: %s", part.FileName())
 						http.Error(w, "Request content is not an image", http.StatusBadRequest)
 						return
 					}
 					contentTypeChecked = true
 				}
 
-				// Write the bytes we read from the part into the chunk to
-				// our file.
-				if n, err = imgfile.Write(chunk[:n]); err != nil {
-					logger.Errorf("Error occurred writing chunk to save file: %v", err)
-
-					w.WriteHeader(500)
-					fmt.Fprintf(w, "Error occured during upload")
-					return
-				}
-				filesize += n
+				// append this chunk to the whole file bytes in memory.
+				fileBytes = append(fileBytes, chunk[:n]...)
 			}
 
-			logger.WithFields(logrus.Fields{
-				"filename": imgfile.Name(),
-				"size":     filesize,
-			}).Info("image saved")
+			// initially, write the file to temp dir,
+			// then we'll copy the file to the watch dir in one go.
+			// This avoids the imageservice getting multiple write
+			// events when the file isn't fully loaded from the network.
+			imgPath := filepath.Join(uploadDir, part.FileName())
+			imgfile, err := os.Create(imgPath)
+			if err != nil {
+				logger.Errorf("Error occurred while creating image file: %v", err)
+
+				w.WriteHeader(500)
+				fmt.Fprintf(w, "Error occured during upload")
+				return
+			}
+			defer imgfile.Close()
+
+			// write the whole file to disc
+			if _, err = imgfile.Write(fileBytes[:]); err != nil {
+				logger.Errorf("Error occurred writing chunk to save file: %v", err)
+				w.WriteHeader(500)
+				fmt.Fprintf(w, "Error occured during upload")
+				return
+			}
+			logger.Debugf("saved file %s", imgfile.Name())
 		}
 	})
 }
