@@ -30,7 +30,7 @@ var (
 
 func init() {
 	flag.StringVar(&mountDir, "dir", defaultDir(), "the path of the directory to watch")
-	logLevelHelp := fmt.Sprintf("The level of logging to use, must be one of (%v)", logrus.AllLevels)
+	logLevelHelp := fmt.Sprintf("The level of logging to use, must be one of %v", logrus.AllLevels)
 	var logLevelParam string
 	flag.StringVar(&logLevelParam, "l", defaultLogLevel.String(), logLevelHelp)
 	port = flag.Int("p", defaultPort, "The port to listen for API requests on.")
