@@ -16,12 +16,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const defaultLogLevel = logrus.InfoLevel
+const (
+	defaultLogLevel = logrus.InfoLevel
+	defaultPort     = 8080
+)
 
 var (
 	logger   *logrus.Logger
 	mountDir string
 	logLevel logrus.Level
+	port     *int
 )
 
 func init() {
@@ -29,6 +33,7 @@ func init() {
 	logLevelHelp := fmt.Sprintf("The level of logging to use, must be one of (%v)", logrus.AllLevels)
 	var logLevelParam string
 	flag.StringVar(&logLevelParam, "l", defaultLogLevel.String(), logLevelHelp)
+	port = flag.Int("p", defaultPort, "The port to listen for API requests on.")
 	flag.Parse()
 
 	logger = initLogger(logLevelParam)
@@ -49,7 +54,7 @@ func main() {
 
 	// Set up server
 	s := &http.Server{
-		Addr:    ":8080",
+		Addr:    fmt.Sprintf(":%d", *port),
 		Handler: logRoute(router),
 	}
 	// start the server log errors.
