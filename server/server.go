@@ -66,6 +66,9 @@ func RemoveHandler(dir string, logger *logrus.Logger) http.HandlerFunc {
 			fullpath := filepath.Join(dir, filepath.Base(file))
 			err := os.Remove(fullpath)
 			if err != nil {
+				if pErr, ok := err.(*os.PathError); ok && pErr == os.ErrNotExist {
+					w.WriteHeader(http.StatusNotFound)
+				}
 				fmt.Fprint(w, "error removing files")
 				w.WriteHeader(http.StatusInternalServerError)
 				logger.Errorf("RemoveHandler(): error deleting file %s: %v", fullpath, err)
@@ -95,7 +98,7 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 
 		if mr, err = r.MultipartReader(); err != nil {
 			logger.Errorf("Error opening multipart reader: %v", err)
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Error occured during upload")
 			return
 		}
@@ -113,11 +116,11 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 				if err != io.EOF {
 					logger.Errorf("Error occurred while fetching next part: %v", err)
 
-					w.WriteHeader(500)
+					w.WriteHeader(http.StatusInternalServerError)
 					fmt.Fprintf(w, "Error occured during upload")
 				} else {
-					w.WriteHeader(200)
-					fmt.Fprintf(w, "Upload complete")
+					w.WriteHeader(http.StatusOK)
+					fmt.Fprintf(w, "")
 				}
 				return
 			}
@@ -130,7 +133,7 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 					if err != io.EOF {
 						logger.Errorf("Error occurred reading chunk: %v", err)
 
-						w.WriteHeader(500)
+						w.WriteHeader(http.StatusInternalServerError)
 						fmt.Fprintf(w, "Error occured during upload")
 						return
 					}
@@ -145,7 +148,7 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 					isImage := strings.Contains(contentType, "image/")
 					if !isImage {
 						logger.Errorf("HandleUpload(): attempted to upload non-image file: %s", part.FileName())
-						http.Error(w, "Request content is not an image", http.StatusBadRequest)
+						http.Error(w, "Request content is not an image", http.StatusUnsupportedMediaType)
 						return
 					}
 					contentTypeChecked = true
@@ -164,7 +167,7 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 			if err != nil {
 				logger.Errorf("Error occurred while creating image file: %v", err)
 
-				w.WriteHeader(500)
+				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprintf(w, "Error occured during upload")
 				return
 			}
@@ -173,7 +176,7 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 			// write the whole file to disc
 			if _, err = imgfile.Write(fileBytes[:]); err != nil {
 				logger.Errorf("Error occurred writing chunk to save file: %v", err)
-				w.WriteHeader(500)
+				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprintf(w, "Error occured during upload")
 				return
 			}
