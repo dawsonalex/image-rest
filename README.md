@@ -16,19 +16,19 @@ CLI usage is as follows:
     	The port to listen for API requests on. (default ":8080")
 ```
 
-## Endpoints
+## List all images in the library
 
-Running `make run` will start the imageservice watching ./sample_images the following is a list of requests can responses the service accepts.
-
-### /list
-
-List returns the metadata about the library of images in the watch directory.
+List images that are in the directory that the image service is watching.
 
 ```HTTP
-GET http://localhost:8080/list
+GET /list
 ```
 
-#### Reseponse
+### Response
+
+```HTTP
+Status: 200 OK
+```
 
 ```JSON
 [
@@ -36,28 +36,13 @@ GET http://localhost:8080/list
         "name": "image1.jpg",
         "width": 4608,
         "height": 3456
-    },
-    {
-        "name": "image2.jpg",
-        "width": 4608,
-        "height": 3456
-    },
-    {
-        "name": "image3.jpg",
-        "width": 4608,
-        "height": 3456
-    },
-    {
-        "name": "image4.jpg",
-        "width": 4608,
-        "height": 3456
     }
 ]
 ```
 
-### /upload
+## Upload an image to the library
 
-Upload allows a user to upload images to the watch directory. The `Content-Type` of the request should be `multipart/form-data`.
+Upload an image or multiple images to the watch directory. The `Content-Type` of the request should be `multipart/form-data`.
 
 The content of the request must match one of the following media types:
 
@@ -65,17 +50,45 @@ The content of the request must match one of the following media types:
 - image/jpg
 - image/gif
 
-
-
 ```HTTP
-POST http://localhost:8080/upload
+POST /upload
 ```
 
 #### Response
 
-If the request content doesn not match one of the stated media types, the server responds with error code 400 Bad Request.
+If the request content does not match one of the stated media types, the server responds with a status of `415 Unsupported Media Type` and empty body.
 
-If the request is processed without error, the server responds with 200 (OK), and an empty content body.
+If the request is processed without error, the server responds with `200 OK`, and an empty body.
+
+## Remove a file from the library
+
+Remove an image from the watch directory by name.
+
+```HTTP
+DELETE /remove
+```
+
+### Parameters 
+
+| **Name** | **Type** | **Description** |
+|----------|----------|-----------------|
+| `name`   | `string` | **Required** The name of the image. |
+
+### Response
+
+The `/remove` endpoint always responds with an empty body, but the status is different under different circumstances:
+
+If the file is removed:
+
+```HTTP
+Status: 200 OK
+```
+
+If the filename doesn't exist:
+
+```HTTP
+Status: 404 Not Found
+```
 
 ## Makefile
 
