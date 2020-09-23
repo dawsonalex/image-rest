@@ -77,6 +77,34 @@ func RemoveHandler(dir string, logger *logrus.Logger) http.HandlerFunc {
 	})
 }
 
+// ImageHandler handles request for individual images.
+func ImageHandler(dir string, logger *logrus.Logger) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !(r.Method == http.MethodGet) {
+			logger.Errorf("Invalid HTTP method, got: %v", r.Method)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		imagenames, ok := r.URL.Query()["name"]
+		if !ok {
+			logger.Errorf("no name paramater provided")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		imagename := imagenames[0]
+		if filepath.Dir(imagename) != "." {
+			logger.Debugf("invalid request for filename: %s", imagename)
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "name param should only contain a file name")
+			return
+		}
+		imagepath := filepath.Join(dir, filepath.Base(imagename))
+		http.ServeFile(w, r, imagepath)
+	})
+}
+
 // UploadHandler handles requests to upload files to the server.
 func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

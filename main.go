@@ -51,6 +51,7 @@ func main() {
 	router.HandleFunc("/list", server.FilesHandler(service, logger))
 	router.HandleFunc("/upload", server.UploadHandler(mountDir, logger))
 	router.HandleFunc("/remove", server.RemoveHandler(mountDir, logger))
+	router.HandleFunc("/image", server.ImageHandler(mountDir, logger))
 
 	// Set up server
 	s := &http.Server{

@@ -90,6 +90,46 @@ If the filename doesn't exist:
 Status: 404 Not Found
 ```
 
+## Get an image from the library
+
+Get an image from the library by name:
+
+```HTTP
+GET /image
+```
+
+### Parameters
+
+| **Name** | **Type** | **Description** |
+|----------|----------|-----------------|
+| `name`   | `string` | **Required** The name of the image. |
+
+If the `name` parameter is passed multiple times, the first instance is used.
+
+### Response
+
+If an image exists:
+
+```HTTP
+Status: 200 OK
+Content-Type: image/*
+```
+
+and content containing an images bytes.
+
+If the image doesn't exist:
+
+```HTTP
+Status: 404 Not Found
+```
+
+If the image name is not valid (The `name` param should only contain the image name, no directory prefix is necessary):
+
+```HTTP
+Status: 400 Bad Request
+```
+
+
 ## Makefile
 
 Most common usage requirements can be accomploshed using Make targets:
