@@ -14,5 +14,8 @@
 # temp binary directory
 bin
 
+# Golang config
+.idea
+
 # sample images that should come with the repo to begin with, but shouldn't be modified.
 sample_images

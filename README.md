@@ -132,7 +132,7 @@ Status: 400 Bad Request
 
 ## Makefile
 
-Most common usage requirements can be accomploshed using Make targets:
+Most common usage requirements can be accomplished using Make targets:
 
 | Make Target | Description                                 |
 |-------------|---------------------------------------------|
