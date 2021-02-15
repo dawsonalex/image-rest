@@ -9,7 +9,7 @@ CLI usage is as follows:
 ```
 ./imageservice:
   -dir string
-    	the path of the directory to watch (default "/home/ad/Projects/image-rest/bin")
+    	the path of the directory to watch (default "/home/$USER/Projects/image-rest/bin")
   -l string
     	The level of logging to use, must be one of [panic fatal error warning info debug trace] (default "info")
   -p string
@@ -141,3 +141,7 @@ Most common usage requirements can be accomplished using Make targets:
 | clean       | Clean the bin/ directory                    |
 | test        | Run all tests in the service                |
 
+## TODO
+
+- [ ] Add source for Google Photos, OneDrive, DB?
+- [ ] Multiple sources / source aggregation.
