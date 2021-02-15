@@ -141,3 +141,7 @@ Most common usage requirements can be accomploshed using Make targets:
 | clean       | Clean the bin/ directory                    |
 | test        | Run all tests in the service                |
 
+## TODO
+
+- [ ] Add source for Google Photos, OneDrive, DB?
+- [ ] Multiple sources / source aggregation.
