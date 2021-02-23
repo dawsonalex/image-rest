@@ -63,15 +63,15 @@ func RemoveHandler(dir string, logger *logrus.Logger) http.HandlerFunc {
 				fmt.Fprint(w, "name param should only contain a file name.")
 				return
 			}
-			fullpath := filepath.Join(dir, filepath.Base(file))
-			err := os.Remove(fullpath)
+			fullPath := filepath.Join(dir, filepath.Base(file))
+			err := os.Remove(fullPath)
 			if err != nil {
 				if pErr, ok := err.(*os.PathError); ok && pErr == os.ErrNotExist {
 					w.WriteHeader(http.StatusNotFound)
 				}
 				fmt.Fprint(w, "error removing files")
 				w.WriteHeader(http.StatusInternalServerError)
-				logger.Errorf("RemoveHandler(): error deleting file %s: %v", fullpath, err)
+				logger.Errorf("RemoveHandler(): error deleting file %s: %v", fullPath, err)
 			}
 		}
 	})
@@ -86,22 +86,22 @@ func ImageHandler(dir string, logger *logrus.Logger) http.HandlerFunc {
 			return
 		}
 
-		imagenames, ok := r.URL.Query()["name"]
+		imageNames, ok := r.URL.Query()["name"]
 		if !ok {
 			logger.Errorf("no name paramater provided")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		imagename := imagenames[0]
-		if filepath.Dir(imagename) != "." {
-			logger.Debugf("invalid request for filename: %s", imagename)
+		imageName := imageNames[0]
+		if filepath.Dir(imageName) != "." {
+			logger.Debugf("invalid request for filename: %s", imageName)
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprint(w, "name param should only contain a file name")
 			return
 		}
-		imagepath := filepath.Join(dir, filepath.Base(imagename))
-		http.ServeFile(w, r, imagepath)
+		imagePath := filepath.Join(dir, filepath.Base(imageName))
+		http.ServeFile(w, r, imagePath)
 	})
 }
 
@@ -191,7 +191,7 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 			// This avoids the imageservice getting multiple write
 			// events when the file isn't fully loaded from the network.
 			imgPath := filepath.Join(uploadDir, part.FileName())
-			imgfile, err := os.Create(imgPath)
+			imageFile, err := os.Create(imgPath)
 			if err != nil {
 				logger.Errorf("Error occurred while creating image file: %v", err)
 
@@ -199,16 +199,16 @@ func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 				fmt.Fprintf(w, "Error occured during upload")
 				return
 			}
-			defer imgfile.Close()
+			defer imageFile.Close()
 
 			// write the whole file to disc
-			if _, err = imgfile.Write(fileBytes[:]); err != nil {
+			if _, err = imageFile.Write(fileBytes[:]); err != nil {
 				logger.Errorf("Error occurred writing chunk to save file: %v", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprintf(w, "Error occured during upload")
 				return
 			}
-			logger.Debugf("saved file %s", imgfile.Name())
+			logger.Debugf("saved file %s", imageFile.Name())
 		}
 	})
 }

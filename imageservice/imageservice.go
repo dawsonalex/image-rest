@@ -14,8 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const imageContentType string = "image/"
-
 // Service defines a structure for watching a directory for image files changes,
 // and getting the images in the directory.
 type Service struct {
@@ -45,7 +43,7 @@ func New(logger *logrus.Logger) *Service {
 	}
 }
 
-// loadFiles reads the dirctory `dir` and returns a list
+// loadFiles reads the directory `dir` and returns a list
 // images it contains.
 func loadFiles(dir string) (ImageList, error) {
 	files, err := ioutil.ReadDir(dir)
