@@ -24,6 +24,9 @@ build:
 run: build
 	bin/imageservice -dir=$(WATCHDIR) -l=$(LOGLEVEL) -p=$(PORT) &
 
+run_attached: build
+	bin/imageservice -dir=$(WATCHDIR) -l=$(LOGLEVEL) -p=$(PORT)
+
 stop:
 	pkill -f imageservice
 
