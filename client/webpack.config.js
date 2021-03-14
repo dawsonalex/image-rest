@@ -62,6 +62,8 @@ module.exports = {
 		hot: true,
 		proxy: {
 			'/list': 'http://localhost:3000',
+			'/image': 'http://localhost:3000',
+			'/upload': 'http://localhost:3000'
 		},
 	}
 };
