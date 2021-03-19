@@ -6,7 +6,11 @@
 
 	function upload() {
 		console.log('Uploading files');
-		document.getElementById('image-form').submit();
+		let formData = new FormData();
+		let fileInput = document.getElementById('image-upload');
+		let files = fileInput.files;
+		formData.append('image', files);
+		fetch('/upload', {method: 'POST', body: formData}).then(response => console.log(response.body));
 	}
 
 	onMount(async () => {
