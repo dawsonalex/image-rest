@@ -7,7 +7,7 @@
     onMount(async () => {
         const res = await fetch(`http://localhost:8080/list`);
         if (res.ok) {
-            // TODO: Image data needs to be scaled, or thumbnails sent from backend, since oringinal images are too big.
+            // TODO: Image data needs to be scaled, or thumbnails sent from backend, since original images are too big.
             imageData = await res.json();
             console.log(imageData);
         } else {
@@ -36,11 +36,11 @@
         column-gap:           0;
     }
 
-    #photos LazyImage {
-        /* Just in case there are inline attributes */
-        width: 100% !important;
-        height: auto !important;
-    }
+    /*#photos LazyImage {*/
+    /*    !* Just in case there are inline attributes *!*/
+    /*    width: 100% !important;*/
+    /*    height: auto !important;*/
+    /*}*/
 
     @media (max-width: 1200px) {
         #photos {
