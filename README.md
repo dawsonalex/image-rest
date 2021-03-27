@@ -4,6 +4,22 @@ A REST API and file server for storing and viewing images.
 
 ## Usage
 
+## Start the client in dev mode
+
+To start the client application run:
+
+```shell
+npm run dev
+```
+
+## Build the client for production
+
+To build the client for a production deployment run:
+
+```shell
+npm run build
+```
+
 CLI usage is as follows:
 
 ```
@@ -137,9 +153,18 @@ Most common usage requirements can be accomplished using Make targets:
 | Make Target | Description                                 |
 |-------------|---------------------------------------------|
 | build       | Build the imageservice to bin/imageservice  |
-| run         | Build the imageservice and start running it |
+| run         | Build the imageservice and run in background|
+| run_attached| Build the imageservice and run in foreground|
 | clean       | Clean the bin/ directory                    |
 | test        | Run all tests in the service                |
+
+Parameters are: 
+
+| Parameter   | Description                                 |
+|-------------|---------------------------------------------|
+| PORT        | (default: 8080) The port the imageservice should listen on  |
+| LOGLEVEL    | (default: debug) The log level the imageservice should use|
+| WATCHDIR    | (default: ./sample_images)The directory the imageservice should watch|
 
 ## TODO
 
