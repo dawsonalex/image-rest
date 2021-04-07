@@ -4,13 +4,17 @@
 
 	export let name;
 
-	function upload() {
+	async function upload() {
 		console.log('Uploading files');
 		let formData = new FormData();
 		let fileInput = document.getElementById('image-upload');
 		let files = fileInput.files;
-		formData.append('image', files);
-		fetch('/upload', {method: 'POST', body: formData}).then(response => console.log(response.body));
+		formData.append('image', files[0]);
+		const uploadResponse = await fetch('/upload', {
+			method: 'POST',
+			body: formData
+		});
+		console.log(uploadResponse.body);
 	}
 
 	onMount(async () => {
