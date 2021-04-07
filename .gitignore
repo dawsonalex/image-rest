@@ -14,9 +14,6 @@
 # temp binary directory
 bin
 
-# svelte build dir
-client/public
-
 # Golang config
 .idea
 
