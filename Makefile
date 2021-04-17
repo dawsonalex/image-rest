@@ -1,6 +1,6 @@
 LOGLEVEL ?= debug
 WATCHDIR ?= ./sample_images
-PORT ?= 8080
+PORT ?= 3000
 RELEASE_PLATFORMS := linux windows darwin# release platforms to build for
 os = $(word 1, $@)
 EXECUTABLE=imageservice
