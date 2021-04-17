@@ -1,6 +1,6 @@
 <script>
     import {onMount} from 'svelte';
-    import LazyImage from './LazyImage.svelte';
+    import ImageLoader from "./ImageLoader.svelte";
 
     let imageData = [];
 
@@ -19,7 +19,8 @@
 <section id="photos">
     {#each imageData as image}
         <!-- TODO: Load API URLs from some main config, don't hardcode them. -->
-        <LazyImage height="{image.height}" width="{image.width}" url="http://localhost:8080/image?name={image.name}" />
+<!--        <LazyImage height="{image.height}" width="{image.width}" url="http://localhost:8080/image?name={image.name}" />-->
+        <ImageLoader height="{image.height}" width="{image.width}" src="http://localhost:8080/image?name={image.name}"/>
     {/each}
 </section>
 
