@@ -3,7 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/dawsonalex/image-rest/imageservice"
+	"github.com/dawsonalex/image-rest/image"
 	"github.com/sirupsen/logrus"
 	"io"
 	"net/http"
@@ -14,7 +14,7 @@ import (
 
 // FilesHandler returns a http.HandlerFunc that accepts requests for an image stores
 // file list.
-func FilesHandler(store *imageservice.Service, logger *logrus.Logger) http.HandlerFunc {
+func FilesHandler(store *image.Service, logger *logrus.Logger) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			logger.Errorf("Invalid HTTP method, got: %v", r.Method)
@@ -23,9 +23,9 @@ func FilesHandler(store *imageservice.Service, logger *logrus.Logger) http.Handl
 		}
 
 		images := store.Files()
-		imageResponse := make([]imageservice.Image, 0)
-		for _, image := range images {
-			imageResponse = append(imageResponse, image)
+		imageResponse := make([]image.Image, 0)
+		for _, img := range images {
+			imageResponse = append(imageResponse, *img)
 		}
 		imageResponse = sortFiles(imageResponse)
 
@@ -36,7 +36,7 @@ func FilesHandler(store *imageservice.Service, logger *logrus.Logger) http.Handl
 }
 
 // softFiles sorts image
-func sortFiles(images []imageservice.Image) []imageservice.Image {
+func sortFiles(images []image.Image) []image.Image {
 	sort.SliceStable(images, func(i, j int) bool {
 		return images[i].Name < images[j].Name
 	})
@@ -102,7 +102,7 @@ func ImageHandler(dir string, logger *logrus.Logger) http.HandlerFunc {
 	})
 }
 
-//// UploadHandler handles requests to upload files to the server.
+// UploadHandler handles requests to upload files to the server.
 //func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 //	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 //		if !(r.Method == http.MethodPost) {
@@ -185,10 +185,12 @@ func ImageHandler(dir string, logger *logrus.Logger) http.HandlerFunc {
 //
 //			// initially, write the file to temp dir,
 //			// then we'll copy the file to the watch dir in one go.
-//			// This avoids the imageservice getting multiple write
+//			// This avoids the image getting multiple write
 //			// events when the file isn't fully loaded from the network.
-//			imgPath := filepath.Join(uploadDir, part.FileName())
-//			imageFile, err := os.Create(imgPath)
+//			//imgPath := filepath.Join(uploadDir, part.FileName())
+//			//imageFile, err := os.Create(imgPath)
+//			imageName := strings.TrimSuffix(filepath.Base(part.FileName()), filepath.Ext(part.FileName()))
+//			imageFile, err := ioutil.TempFile(os.TempDir(), imageName + "upload-*.tmp")
 //			if err != nil {
 //				logger.Errorf("Error occurred while creating image file: %v", err)
 //
@@ -205,12 +207,19 @@ func ImageHandler(dir string, logger *logrus.Logger) http.HandlerFunc {
 //				fmt.Fprintf(w, "Error occured during upload")
 //				return
 //			}
+//			if err = os.Rename(imageFile.Name(), filepath.Join(uploadDir, part.FileName())); err != nil {
+//				w.WriteHeader(http.StatusInternalServerError)
+//				fmt.Fprintf(w, "Error occurred during upload")
+//				logger.Debugf("UploadHandler(): error renaming image: %v", err)
+//				return
+//			}
 //			logger.Debugf("http: saved file %s", imageFile.Name())
 //		}
 //	})
 //}
 
-func UploadHandler(uploadDir string, logger *logrus.Logger) http.HandlerFunc {
+// UploadHandler handls uploads
+func UploadHandler(imageService *image.Service, uploadDir string, logger *logrus.Logger) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		//get the multipart reader for the request.
 		reader, err := r.MultipartReader()

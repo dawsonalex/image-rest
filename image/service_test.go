@@ -1,4 +1,4 @@
-package imageservice
+package image
 
 import (
 	"io/ioutil"

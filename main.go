@@ -11,7 +11,7 @@ import (
 
 	"github.com/dawsonalex/image-rest/server"
 
-	"github.com/dawsonalex/image-rest/imageservice"
+	"github.com/dawsonalex/image-rest/image"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
@@ -41,7 +41,7 @@ func init() {
 
 func main() {
 
-	service := imageservice.New(logger)
+	service := image.New(logger)
 	err := service.Watch(mountDir)
 	if err != nil {
 		logger.Fatalf("error watching dir %s: %v", mountDir, err)
@@ -49,7 +49,7 @@ func main() {
 
 	router := http.NewServeMux()
 	router.HandleFunc("/list", server.FilesHandler(service, logger))
-	router.HandleFunc("/upload", server.UploadHandler(mountDir, logger))
+	router.HandleFunc("/upload", server.UploadHandler(service, mountDir, logger))
 	router.HandleFunc("/remove", server.RemoveHandler(mountDir, logger))
 	router.HandleFunc("/image", server.ImageHandler(mountDir, logger))
 
